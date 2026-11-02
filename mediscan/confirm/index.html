@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex">
-<title>MediScan · Email confirmation</title>
+<title>MediScan · Account</title>
 <style>
   :root {
     color-scheme: light;
@@ -46,6 +46,18 @@
   li { margin: 6px 0; }
   .note { font-size: 13px; margin-top: 18px; }
   .hidden { display: none; }
+  form { text-align: left; margin-top: 16px; }
+  label { display: block; font-size: 14px; font-weight: 600; margin: 12px 0 6px; }
+  input { width: 100%; font: inherit; padding: 12px 14px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--muted) 40%, transparent);
+          background: color-mix(in srgb, var(--bg) 60%, var(--card)); color: var(--text); }
+  input:focus { outline: 2px solid var(--brand); border-color: transparent; }
+  .rules { list-style: none; padding: 0; margin: 10px 0 0; font-size: 13px; color: var(--muted); }
+  .rules li.ok { color: var(--ok); }
+  .rules li::before { content: "○ "; } .rules li.ok::before { content: "● "; }
+  button { width: 100%; margin-top: 18px; font: inherit; font-weight: 600; padding: 14px; border: 0; border-radius: 14px;
+           background: var(--brand); color: #fff; cursor: pointer; }
+  button:disabled { opacity: .45; cursor: default; }
+  .msg { font-size: 14px; margin-top: 12px; color: var(--warn); }
   svg { display: block; }
   @media (prefers-reduced-motion: no-preference) {
     .pulse { animation: pulse 1.6s ease-in-out infinite; transform-origin: center; }
@@ -75,6 +87,36 @@
       <p class="note">You can close this page.</p>
     </section>
 
+    <section id="reset" class="hidden">
+      <div class="badge ok" aria-hidden="true">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3"/></svg>
+      </div>
+      <h1>Set a new password</h1>
+      <p>Choose a new password for your MediScan account.</p>
+      <form id="reset-form" novalidate>
+        <label for="pw">New password</label>
+        <input id="pw" type="password" autocomplete="new-password" required>
+        <label for="pw2">Confirm password</label>
+        <input id="pw2" type="password" autocomplete="new-password" required>
+        <ul class="rules">
+          <li id="r-len">At least 8 characters</li>
+          <li id="r-mix">Letters and numbers</li>
+          <li id="r-match">Passwords match</li>
+        </ul>
+        <button id="save" type="submit" disabled>Save new password</button>
+        <p id="reset-msg" class="msg" role="alert"></p>
+      </form>
+    </section>
+
+    <section id="done" class="hidden">
+      <div class="badge ok" aria-hidden="true">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+      </div>
+      <h1>Password updated</h1>
+      <p>Go back to the <b>MediScan</b> app and sign in with your new password.</p>
+      <p class="note">You can close this page.</p>
+    </section>
+
     <section id="err" class="hidden">
       <div class="badge warn" aria-hidden="true">
         <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><path d="M12 7v6M12 17h.01"/></svg>
@@ -91,21 +133,69 @@
 
 <script>
   // The sign-in service appends the result to the URL fragment (after "#"):
-  // details on success, or error / error_code / error_description on failure.
-  // The fragment never reaches any server; it is read here and wiped from the address bar.
+  // on success, a short-lived access token and the link type (signup or
+  // recovery); on failure, error / error_code / error_description.
+  // The fragment never reaches any server. It is read here, kept in memory only,
+  // and wiped from the address bar straight away.
+  var AUTH_URL = "https://uhxfevdntkjarrijkusg.supabase.co/auth/v1";
+  var PUBLISHABLE_KEY = "sb_publishable_5FIBQZbA29NfUIPNcowg4A_vSgwkP2r";   // public by design; per-user security rules protect data
+
   (function () {
     var params = new URLSearchParams((location.hash || "").replace(/^#/, "") || location.search);
     var error = params.get("error") || params.get("error_code");
+    var type = params.get("type");
+    var token = params.get("access_token");
     if (location.hash || location.search) history.replaceState(null, "", location.pathname);
+
+    function show(id) {
+      ["ok", "reset", "done", "err"].forEach(function (s) { document.getElementById(s).classList.toggle("hidden", s !== id); });
+    }
+
     if (error) {
-      document.getElementById("ok").classList.add("hidden");
-      document.getElementById("err").classList.remove("hidden");
+      show("err");
       var code = params.get("error_code");
       if (code && code !== "otp_expired") {
         document.getElementById("err-detail").textContent =
-          (params.get("error_description") || "This confirmation link can't be used.").replace(/\+/g, " ");
+          (params.get("error_description") || "This link can't be used.").replace(/\+/g, " ");
       }
+      return;
     }
+    if (type !== "recovery" || !token) { show("ok"); return; }
+
+    show("reset");
+    var pw = document.getElementById("pw"), pw2 = document.getElementById("pw2");
+    var save = document.getElementById("save"), msg = document.getElementById("reset-msg");
+    function check() {
+      var len = pw.value.length >= 8, mix = /[A-Za-z]/.test(pw.value) && /\d/.test(pw.value), match = pw2.value.length > 0 && pw.value === pw2.value;
+      document.getElementById("r-len").classList.toggle("ok", len);
+      document.getElementById("r-mix").classList.toggle("ok", mix);
+      document.getElementById("r-match").classList.toggle("ok", match);
+      save.disabled = !(len && mix && match);
+    }
+    pw.addEventListener("input", check); pw2.addEventListener("input", check);
+    document.getElementById("reset-form").addEventListener("submit", function (e) {
+      e.preventDefault();
+      if (save.disabled) return;
+      save.disabled = true; save.textContent = "Saving…"; msg.textContent = "";
+      fetch(AUTH_URL + "/user", {
+        method: "PUT",
+        headers: { "apikey": PUBLISHABLE_KEY, "Authorization": "Bearer " + token, "Content-Type": "application/json" },
+        body: JSON.stringify({ password: pw.value })
+      }).then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (body) { return { ok: r.ok, body: body }; });
+      }).then(function (res) {
+        if (res.ok) { token = null; show("done"); return; }
+        var b = res.body || {};
+        var text = b.msg || b.error_description || b.message || "Couldn't update the password.";
+        if (b.error_code === "same_password") text = "Choose a password different from your current one.";
+        if (b.error_code === "weak_password") text = "That password is too weak. Use 8+ characters with letters and numbers.";
+        if (res.body && (b.error_code === "bad_jwt" || b.code === 401 || b.error_code === "session_expired")) text = "This reset link has expired. Request a new one from the app.";
+        msg.textContent = text; save.textContent = "Save new password"; check();
+      }).catch(function () {
+        msg.textContent = "Network error. Check your connection and try again.";
+        save.textContent = "Save new password"; check();
+      });
+    });
   })();
 </script>
 </body>
