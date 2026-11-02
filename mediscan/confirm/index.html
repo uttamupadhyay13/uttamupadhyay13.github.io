@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex">
+<title>MediScan · Email confirmation</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #eef6f6; --card: #ffffff; --text: #0f1f22; --muted: #5a6b6e;
+    --brand: #0d8c8f; --brand-deep: #08545f; --ok: #219e61; --warn: #d9822b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #0c1416; --card: #152124; --text: #e9f1f2; --muted: #9db0b3;
+      --brand: #2bb3b6; --brand-deep: #1b7f87; --ok: #3cc583; --warn: #f0a24a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px 16px;
+    background: radial-gradient(1200px 600px at 20% -10%, color-mix(in srgb, var(--brand) 22%, transparent), transparent),
+                radial-gradient(900px 500px at 110% 10%, color-mix(in srgb, #6c63ff 16%, transparent), transparent), var(--bg);
+    color: var(--text); font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  .card {
+    width: 100%; max-width: 440px; background: var(--card); border-radius: 24px; padding: 36px 28px 28px;
+    text-align: center; box-shadow: 0 20px 60px rgba(8, 84, 95, .15);
+  }
+  .logo {
+    width: 84px; height: 84px; margin: 0 auto 20px; border-radius: 22px; display: grid; place-items: center;
+    background: linear-gradient(135deg, var(--brand), var(--brand-deep));
+  }
+  .badge {
+    width: 64px; height: 64px; margin: -52px auto 14px; border-radius: 50%; display: grid; place-items: center;
+    border: 4px solid var(--card); transform: translate(34px, 0);
+  }
+  .badge.ok { background: var(--ok); }
+  .badge.warn { background: var(--warn); }
+  h1 { font-size: 24px; margin: 6px 0 8px; }
+  p { color: var(--muted); margin: 0 0 14px; }
+  ol { text-align: left; color: var(--text); padding-left: 22px; margin: 18px 0 6px; }
+  li { margin: 6px 0; }
+  .note { font-size: 13px; margin-top: 18px; }
+  .hidden { display: none; }
+  svg { display: block; }
+  @media (prefers-reduced-motion: no-preference) {
+    .pulse { animation: pulse 1.6s ease-in-out infinite; transform-origin: center; }
+    @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+  }
+</style>
+</head>
+<body>
+  <main class="card" aria-live="polite">
+    <div class="logo" aria-hidden="true">
+      <svg width="52" height="32" viewBox="0 0 52 32" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M2 18h11l3-6 3 6h4l4-15 5 26 4-14 2 3h11"/>
+      </svg>
+    </div>
+
+    <section id="ok">
+      <div class="badge ok pulse" aria-hidden="true">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+      </div>
+      <h1>Email confirmed</h1>
+      <p>Your MediScan account is ready.</p>
+      <ol>
+        <li>Go back to the <b>MediScan</b> app.</li>
+        <li>Tap <b>I've confirmed, continue</b>.</li>
+        <li>Set up your profile and add your first report.</li>
+      </ol>
+      <p class="note">You can close this page.</p>
+    </section>
+
+    <section id="err" class="hidden">
+      <div class="badge warn" aria-hidden="true">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><path d="M12 7v6M12 17h.01"/></svg>
+      </div>
+      <h1>Link expired or already used</h1>
+      <p id="err-detail">This confirmation link can't be used any more.</p>
+      <ol>
+        <li>If you already confirmed, just open <b>MediScan</b> and sign in.</li>
+        <li>Otherwise, open the app and tap <b>Resend email</b>, then use the newest link.</li>
+      </ol>
+      <p class="note">Links expire after one hour and work only once.</p>
+    </section>
+  </main>
+
+<script>
+  // Supabase appends the result to the URL fragment: tokens on success, or
+  // error / error_code / error_description on failure. The fragment never
+  // reaches any server; it is read here and wiped from the address bar.
+  (function () {
+    var params = new URLSearchParams((location.hash || "").replace(/^#/, "") || location.search);
+    var error = params.get("error") || params.get("error_code");
+    if (location.hash || location.search) history.replaceState(null, "", location.pathname);
+    if (error) {
+      document.getElementById("ok").classList.add("hidden");
+      document.getElementById("err").classList.remove("hidden");
+      var code = params.get("error_code");
+      if (code && code !== "otp_expired") {
+        document.getElementById("err-detail").textContent =
+          (params.get("error_description") || "This confirmation link can't be used.").replace(/\+/g, " ");
+      }
+    }
+  })();
+</script>
+</body>
+</html>
