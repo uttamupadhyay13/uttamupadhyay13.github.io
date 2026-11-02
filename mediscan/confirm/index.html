@@ -90,9 +90,9 @@
   </main>
 
 <script>
-  // Supabase appends the result to the URL fragment: tokens on success, or
-  // error / error_code / error_description on failure. The fragment never
-  // reaches any server; it is read here and wiped from the address bar.
+  // The sign-in service appends the result to the URL fragment (after "#"):
+  // details on success, or error / error_code / error_description on failure.
+  // The fragment never reaches any server; it is read here and wiped from the address bar.
   (function () {
     var params = new URLSearchParams((location.hash || "").replace(/^#/, "") || location.search);
     var error = params.get("error") || params.get("error_code");
